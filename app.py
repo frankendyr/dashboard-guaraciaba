@@ -1,65 +1,56 @@
+import streamlit as st
 import pandas as pd
 import plotly.express as px
-import streamlit as st
 
-# Título do painel
-st.set_page_config(page_title="Painel das Escolas de Guaraciaba", layout="wide")
+# Título do Painel
+st.set_page_config(layout="wide")
 st.title("📊 Painel das Escolas - Guaraciaba do Norte")
 
-# Carregando o CSV
+# Carregamento do CSV
 df = pd.read_csv("dashboard_escolas_guaraciaba.csv")
 
-# Filtro apenas para escolas MUNICIPAIS
-df_municipal = df[df['dependencia_adm'] == 'Municipal']
+# Verifica colunas disponíveis
+colunas = df.columns.tolist()
 
-# Indicadores principais
+# Filtrar apenas escolas municipais
+df_municipal = df[df["dependencia_administrativa"] == "Municipal"]
+
+# KPIs - Indicadores
 total_escolas = len(df_municipal)
-total_zona_urbana = len(df_municipal[df_municipal['zona'] == 'Urbana'])
-total_zona_rural = len(df_municipal[df_municipal['zona'] == 'Rural'])
+total_escolas_geral = len(df)
+porcentagem_municipais = round((total_escolas / total_escolas_geral) * 100, 2)
+media_matriculas = int(df_municipal["qtd_matricula"].mean())
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Total de Escolas Municipais", total_escolas)
-col2.metric("Escolas na Zona Urbana", total_zona_urbana, f"{(total_zona_urbana/total_escolas)*100:.1f}%")
-col3.metric("Escolas na Zona Rural", total_zona_rural, f"{(total_zona_rural/total_escolas)*100:.1f}%")
+col1.metric("🏫 Total de Escolas Municipais", total_escolas)
+col2.metric("📈 % Municipal", f"{porcentagem_municipais}%")
+col3.metric("👩‍🎓 Média de Matrículas", media_matriculas)
 
 st.markdown("---")
 
-# Gráfico 1: Distribuição por Etapa de Ensino
-fig1 = px.bar(
-    df_municipal['etapas_ensino'].value_counts().reset_index(),
-    x='index', y='etapas_ensino',
-    labels={'index': 'Etapa de Ensino', 'etapas_ensino': 'Quantidade'},
-    title="Distribuição de Escolas por Etapa de Ensino"
-)
+# 📊 Gráfico 1: Porte das Escolas
+st.subheader("Distribuição por Porte das Escolas")
+porte_counts = df_municipal["porte"].value_counts().reset_index()
+porte_counts.columns = ["Porte", "Quantidade"]
+fig1 = px.bar(porte_counts, x="Porte", y="Quantidade", color="Porte", text="Quantidade")
+fig1.update_layout(xaxis_title="Porte", yaxis_title="Número de Escolas")
 st.plotly_chart(fig1, use_container_width=True)
 
-# Gráfico 2: Porte das Escolas
-fig2 = px.pie(
-    df_municipal, names='porte',
-    title="Distribuição de Porte das Escolas Municipais",
-    hole=0.4
-)
+# 📊 Gráfico 2: Quantidade de Matrículas por Escola
+st.subheader("Quantidade de Matrículas por Escola")
+fig2 = px.histogram(df_municipal, x="qtd_matricula", nbins=20, title="Distribuição de Matrículas")
+fig2.update_layout(xaxis_title="Quantidade de Matrículas", yaxis_title="Número de Escolas")
 st.plotly_chart(fig2, use_container_width=True)
 
-# Gráfico 3: Quantidade de Escolas por Zona
-fig3 = px.bar(
-    df_municipal['zona'].value_counts().reset_index(),
-    x='index', y='zona',
-    labels={'index': 'Zona', 'zona': 'Quantidade'},
-    title="Quantidade de Escolas por Zona"
-)
+# 📊 Gráfico 3: Modalidade de Ensino
+st.subheader("Distribuição por Modalidade de Ensino")
+modalidade_counts = df_municipal["modalidade_ensino"].value_counts().reset_index()
+modalidade_counts.columns = ["Modalidade", "Quantidade"]
+fig3 = px.pie(modalidade_counts, names="Modalidade", values="Quantidade", hole=0.4)
 st.plotly_chart(fig3, use_container_width=True)
-
-# Gráfico 4: Tipo de Localização
-if 'local_func_predio' in df_municipal.columns:
-    fig4 = px.histogram(
-        df_municipal, x='local_func_predio',
-        title="Localização das Escolas Municipais"
-    )
-    st.plotly_chart(fig4, use_container_width=True)
 
 st.markdown("---")
 
-# Tabela final com a lista de escolas
-st.subheader("📋 Lista de Escolas Municipais")
-st.dataframe(df_municipal[['nome_escola', 'zona', 'etapas_ensino', 'porte']].sort_values(by='nome_escola'))
+# 📋 Tabela Final
+st.subheader("📋 Lista das Escolas Municipais")
+st.dataframe(df_municipal.sort_values(by="nome_escola"), use_container_width=True)
