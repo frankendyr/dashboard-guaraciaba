@@ -1,77 +1,61 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import matplotlib.pyplot as plt
 
-# Carregar os dados
-df = pd.read_csv("dashboard_escolas_guaraciaba.csv")
+# Configuração da página
+st.set_page_config(page_title="Painel Educacional - Guaraciaba do Norte", layout="wide")
 
-# Tratamento de nomes de colunas
-df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+# Carregamento dos dados
+@st.cache_data
+def carregar_dados():
+    df = pd.read_csv("dashboard_escolas_guaraciaba.csv")
+    df.columns = df.columns.str.lower()  # padronizar nomes das colunas
+    return df
 
-# Título
-st.set_page_config(page_title="Painel das Escolas - Guaraciaba do Norte", layout="wide")
-st.title("📊 Painel das Escolas - Guaraciaba do Norte")
+df = carregar_dados()
 
-# Filtros
-anos = sorted(df['ano_censo'].unique())
-ano_sel = st.selectbox("Selecione o ano", anos)
-
-redes = df['rede'].unique()
-rede_sel = st.selectbox("Selecione a rede", redes)
-
-# Filtro do DataFrame
-df_filtrado = df[(df['ano_censo'] == ano_sel) & (df['rede'] == rede_sel)]
+# Filtrar escolas municipais
+municipais = df[df['dependencia_administrativa'].str.upper() == 'MUNICIPAL']
 
 # Indicadores principais
-total_escolas = df_filtrado.shape[0]
-municipais = df_filtrado[df_filtrado['dependencia_adm'] == 'Municipal'].shape[0]
-estaduais = df_filtrado[df_filtrado['dependencia_adm'] == 'Estadual'].shape[0]
-privadas = df_filtrado[df_filtrado['dependencia_adm'] == 'Privada'].shape[0]
+total_escolas = len(df)
+total_municipais = len(municipais)
+perc_municipais = (total_municipais / total_escolas) * 100
 
-col1, col2, col3, col4 = st.columns(4)
+perc_urbana_municipais = (municipais['localizacao'].str.upper() == 'URBANA').mean() * 100
+perc_rural_municipais = (municipais['localizacao'].str.upper() == 'RURAL').mean() * 100
+
+st.title("📊 Painel Educacional - Guaraciaba do Norte (CE)")
+st.markdown("### 🎯 Foco: Escolas Municipais")
+
+col1, col2, col3 = st.columns(3)
 col1.metric("Total de Escolas", total_escolas)
-col2.metric("Municipais", f"{municipais} ({municipais/total_escolas:.0%})")
-col3.metric("Estaduais", f"{estaduais} ({estaduais/total_escolas:.0%})")
-col4.metric("Privadas", f"{privadas} ({privadas/total_escolas:.0%})")
+col2.metric("Qtd Municipais", total_municipais)
+col3.metric("% Municipais", f"{perc_municipais:.1f}%")
 
-st.markdown("---")
+col4, col5 = st.columns(2)
+col4.metric("% Municipais Urbanas", f"{perc_urbana_municipais:.1f}%")
+col5.metric("% Municipais Rurais", f"{perc_rural_municipais:.1f}%")
 
-# Gráfico 1: Porte das Escolas
-st.subheader("📐 Distribuição por Porte das Escolas")
-porte_data = df_filtrado['porte'].value_counts().reset_index()
-porte_data.columns = ['Porte', 'Quantidade']
-fig1 = px.bar(porte_data, x='Porte', y='Quantidade', color='Porte', text='Quantidade')
-st.plotly_chart(fig1, use_container_width=True)
 
-# Gráfico 2: Etapas de Ensino Ofertadas
-st.subheader("📚 Etapas de Ensino Ofertadas")
-etapas_cols = [
-    'educacao_infantil_creche', 'educacao_infantil_pre_escola',
-    'ensino_fundamental_anos_iniciais', 'ensino_fundamental_anos_finais',
-    'ensino_medio'
-]
-etapas_labels = {
-    'educacao_infantil_creche': 'Creche',
-    'educacao_infantil_pre_escola': 'Pré-escola',
-    'ensino_fundamental_anos_iniciais': 'EF Anos Iniciais',
-    'ensino_fundamental_anos_finais': 'EF Anos Finais',
-    'ensino_medio': 'Ensino Médio'
-}
-etapas_qtd = {
-    etapas_labels[col]: df_filtrado[col].sum() for col in etapas_cols
-}
-etapas_df = pd.DataFrame(etapas_qtd.items(), columns=['Etapa', 'Quantidade'])
-fig2 = px.pie(etapas_df, names='Etapa', values='Quantidade', title="Distribuição das Etapas de Ensino")
-st.plotly_chart(fig2, use_container_width=True)
+st.divider()
+st.subheader("📌 Gráficos Simples")
 
-# Gráfico 3: Localização das Escolas
-st.subheader("📍 Localização das Escolas")
-local_data = df_filtrado['localizacao'].value_counts().reset_index()
-local_data.columns = ['Localização', 'Quantidade']
-fig3 = px.bar(local_data, x='Localização', y='Quantidade', color='Localização', text='Quantidade')
-st.plotly_chart(fig3, use_container_width=True)
+# Gráfico 1 - Dependência Administrativa
+st.markdown("#### Número de Escolas por Dependência Administrativa")
+fig1, ax1 = plt.subplots()
+df['dependencia_administrativa'].value_counts().plot(kind='bar', ax=ax1, color='skyblue')
+ax1.set_ylabel("Número de Escolas")
+st.pyplot(fig1)
 
-# Lista das Escolas
-st.markdown("---")
-st.subheader("📋 Lista de Escolas")
-st.dataframe(df_filtrado[['nome_escola', 'dependencia_adm', 'localizacao', 'bairro']], use_container_width=True)
+# Gráfico 2 - Localização
+st.markdown("#### Número de Escolas por Localização (Urbana/Rural)")
+fig2, ax2 = plt.subplots()
+df['localizacao'].value_counts().plot(kind='bar', ax=ax2, color='lightgreen')
+ax2.set_ylabel("Número de Escolas")
+st.pyplot(fig2)
+
+# Gráfico 3 - Porte das Escolas
+st.markdown("#### Número de Escolas por Porte")
+fig3, ax3 = plt.subplots()
+df['porte'].value_counts().plot(kind='bar_
