@@ -1,59 +1,65 @@
-import streamlit as st
 import pandas as pd
 import plotly.express as px
+import streamlit as st
 
-# Título do Painel
-st.set_page_config(page_title="Painel de Escolas - Guaraciaba", layout="wide")
-st.title("📊 Painel de Escolas - Guaraciaba do Norte/CE")
+# Título do painel
+st.set_page_config(page_title="Painel das Escolas de Guaraciaba", layout="wide")
+st.title("📊 Painel das Escolas - Guaraciaba do Norte")
 
-# Carregamento do CSV
-@st.cache_data
-def carregar_dados():
-    df = pd.read_csv("dashboard_escolas_guaraciaba.csv")
-    return df
+# Carregando o CSV
+df = pd.read_csv("dashboard_escolas_guaraciaba.csv")
 
-df = carregar_dados()
+# Filtro apenas para escolas MUNICIPAIS
+df_municipal = df[df['dependencia_adm'] == 'Municipal']
 
-# Filtro para escolas municipais
-df_municipal = df[df['dependencia_administrativa'] == 'Municipal']
+# Indicadores principais
+total_escolas = len(df_municipal)
+total_zona_urbana = len(df_municipal[df_municipal['zona'] == 'Urbana'])
+total_zona_rural = len(df_municipal[df_municipal['zona'] == 'Rural'])
 
-# Exibição de métrica
-col1, col2 = st.columns(2)
-col1.metric("Total de Escolas", len(df))
-col2.metric("Escolas Municipais", len(df_municipal))
+col1, col2, col3 = st.columns(3)
+col1.metric("Total de Escolas Municipais", total_escolas)
+col2.metric("Escolas na Zona Urbana", total_zona_urbana, f"{(total_zona_urbana/total_escolas)*100:.1f}%")
+col3.metric("Escolas na Zona Rural", total_zona_rural, f"{(total_zona_rural/total_escolas)*100:.1f}%")
 
-st.divider()
+st.markdown("---")
 
-# Tabela de todas as escolas
-st.subheader("📋 Lista de Escolas")
-st.dataframe(df[['nome', 'dependencia_administrativa', 'categoria_administrativa', 'porte', 'etapas_modalidades_oferecidas']], use_container_width=True)
-
-st.divider()
-
-# Gráfico: Dependência Administrativa
-st.subheader("🏛️ Dependência Administrativa")
-fig1 = px.pie(df, names='dependencia_administrativa', title='Distribuição por Dependência')
+# Gráfico 1: Distribuição por Etapa de Ensino
+fig1 = px.bar(
+    df_municipal['etapas_ensino'].value_counts().reset_index(),
+    x='index', y='etapas_ensino',
+    labels={'index': 'Etapa de Ensino', 'etapas_ensino': 'Quantidade'},
+    title="Distribuição de Escolas por Etapa de Ensino"
+)
 st.plotly_chart(fig1, use_container_width=True)
 
-# Gráfico: Porte das Escolas (Municipais)
-st.subheader("🏫 Porte das Escolas Municipais")
-df_municipal_porte = df_municipal['porte'].value_counts().reset_index()
-df_municipal_porte.columns = ['Porte', 'Quantidade']
-fig2 = px.bar(df_municipal_porte, x='Porte', y='Quantidade', text='Quantidade', title='Distribuição por Porte - Escolas Municipais')
+# Gráfico 2: Porte das Escolas
+fig2 = px.pie(
+    df_municipal, names='porte',
+    title="Distribuição de Porte das Escolas Municipais",
+    hole=0.4
+)
 st.plotly_chart(fig2, use_container_width=True)
 
-# Gráfico: Categorias Administrativas
-st.subheader("📂 Categoria Administrativa")
-fig3 = px.histogram(df, x='categoria_administrativa', color='dependencia_administrativa', barmode='group')
+# Gráfico 3: Quantidade de Escolas por Zona
+fig3 = px.bar(
+    df_municipal['zona'].value_counts().reset_index(),
+    x='index', y='zona',
+    labels={'index': 'Zona', 'zona': 'Quantidade'},
+    title="Quantidade de Escolas por Zona"
+)
 st.plotly_chart(fig3, use_container_width=True)
 
-# Gráfico: Etapas e Modalidades
-st.subheader("📚 Etapas / Modalidades Oferecidas")
-df_etapas = df['etapas_modalidades_oferecidas'].dropna().value_counts().reset_index()
-df_etapas.columns = ['Etapas/Modalidades', 'Quantidade']
-fig4 = px.bar(df_etapas, y='Etapas/Modalidades', x='Quantidade', orientation='h', text='Quantidade')
-st.plotly_chart(fig4, use_container_width=True)
+# Gráfico 4: Tipo de Localização
+if 'local_func_predio' in df_municipal.columns:
+    fig4 = px.histogram(
+        df_municipal, x='local_func_predio',
+        title="Localização das Escolas Municipais"
+    )
+    st.plotly_chart(fig4, use_container_width=True)
 
-# Rodapé
 st.markdown("---")
-st.caption("Dados fornecidos por Kennedy | Desenvolvido com ❤️ usando Streamlit")
+
+# Tabela final com a lista de escolas
+st.subheader("📋 Lista de Escolas Municipais")
+st.dataframe(df_municipal[['nome_escola', 'zona', 'etapas_ensino', 'porte']].sort_values(by='nome_escola'))
